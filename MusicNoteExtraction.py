@@ -1,60 +1,61 @@
-####################################################################################################
-#  Revision:
-#       0.01 - 06/09/18 - Five lines removed.
-#       0.02 - 06/22/18 - Notes are cut, but only filled heads can be correctly selected.
-#  
-#  Additional Comments:
-#       None.
-###################################################################################################
+# -*- coding: utf-8 -*-
+"""
+    Usage:
+        python MusicNoteExtraction.py path
 
+        path: Image path.
 
-###################################################################################################
-#  Steps：
-#  1. Use `cv2.morphologyEx` to remove horizontal and vertical lines, and only notes are left.
-#  2. Use `cv2.findContours` to find the contours of the notes.
-#  3. Show the result with the found contours.
-###################################################################################################
-
+    Steps：
+        1. Use `cv2.morphologyEx` to remove horizontal and vertical lines, and only notes are left.
+        2. Use `cv2.findContours` to find the contours of the notes.
+        3. Show the result with the found contours.
+"""
 
 import cv2
 import numpy as np
 import os
+import sys
 
-# Reading path of original image.
-path = "C:\\Users\\OscarShu\\Desktop\\Cut2.jpg"
+
+assert len(sys.argv) == 2, 'Please input the image path.'
+path = sys.argv[1]
 img = cv2.imread(path)
+
 # Gray-scale image.
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-###################################### Select Straight lines ######################################
-# Kernel for filter.
+"""
+Select straight lines.
+"""
 kernel_f = np.array([[-2, -2, -2], [1, 1, 1], [2, 2, 2]], np.float32)
 img_filter = cv2.filter2D(img, -1, kernel_f)
+
 # Binarization gray-scale image with Canny function.
 BinGray = cv2.Canny(img_filter, 900, 100, 10)
 
 # Create a black image in the same shape as `img`.
 black = np.zeros(img.shape)
-print(black.shape)
-# Use Hough Transform to recognize straight lines.
-tmp_hough = cv2.HoughLinesP(BinGray, 1, (np.pi / 180), 100, minLineLength = (img.shape[1] * 2 // 3), maxLineGap = 100)
 
-hough = tmp_hough[:,0,:]
+# Use Hough Transform to recognize straight lines.
+tmp_hough = cv2.HoughLinesP(BinGray, 1, (np.pi / 180), 100, minLineLength=(img.shape[1] * 2 // 3), maxLineGap=100)
+
+hough = tmp_hough[:, 0, :]
 # Save y-coordinate of all recognized straight lines.
-Lines = []
+lines = []
 
 for x1, y1, x2, y2 in hough:
     if abs((y1 - y2) / (x2 - x1)) < 0.01:
         # Select horizontal lines.
         cv2.line(black, (x1, y1), (x2, y2), (0, 255, 0), 1)
-        Lines.append(y2)
+        lines.append(y2)
 
 # Sort by y-coordinate in ascendant order.
-Lines.sort()
-###################################################################################################
+lines.sort()
 
-################################### Segmentation of whole image ###################################
-# To recognize the correct lines and find out the width of two adjacent lines.
+"""
+Segmentation.
+"""
+# Recognize the correct lines and find out the width of two adjacent lines.
 def RecognizeCorrectLines(lines):
     # Save as (Position, Width): Times.
     tmp = {}
@@ -78,16 +79,16 @@ def RecognizeCorrectLines(lines):
                     tmp[(tmp[tmp_findindex], lines[l])] += 1
 
     result = max(tmp[x] for x, y in tmp.items())       
-    # return as (Position, Width).
+    # return as (pos, width).
     return result
 
 delta = []
-for i in range(len(Lines) - 1):
-    for j in range((i + 1), (len(Lines))):
-        delta.append(Lines[j] - Lines[i])
-print(Lines)
-print(delta)
+for i in range(len(lines) - 1):
+    for j in range((i + 1), (len(lines))):
+        delta.append(lines[j] - lines[i])
+
 (pos, tmp_width) = RecognizeCorrectLines(delta)
+
 # Calculate the average width of two adjacent lines.
 black2 = np.zeros(img.shape)
 edge = np.array([])
@@ -101,9 +102,9 @@ cv2.imshow("Line Detection", black2)
 cv2.waitKey(0)
 
 # Delete the edges that ratio of length to width is larger the threshold.
-def EliminateRatio(MyContours, ratio = 2):
+def EliminateRatio(MyContours, ratio=2):
     if len(MyContours) == 0:
-        print("** Error：Contours not found. **")
+        print("Error: Contours not found.")
 
     NewContours = []
 
@@ -116,7 +117,7 @@ def EliminateRatio(MyContours, ratio = 2):
 # Delete the edges that the width is not equal to the average of width (Default: larger).
 def EliminateWidth(MyContours, ratio = 1.0, big = 1):
     if len(MyContours) == 0:
-        raise ZeroDivisionError('*** Error：Contours not found, so the average may be divided by zero. ***')
+        raise ZeroDivisionError('Error: Contours not found, so the average may be divided by zero.')
 
     NewContours = []
     average = 0
@@ -138,9 +139,9 @@ def EliminateWidth(MyContours, ratio = 1.0, big = 1):
     return NewContours
 
 # Delete the edges that the height is not equal to the average of width (Default: larger).
-def EliminateHeight(MyContours, ratio = 1.0, big = 1):
+def EliminateHeight(MyContours, ratio=1.0, big=1):
     if len(MyContours) == 0:
-        raise ZeroDivisionError('*** Error：Contours not found, so the average may be divided by zero. ***')
+        raise ZeroDivisionError('Error: Contours not found, so the average may be divided by zero.')
 
     NewContours = []
     average = 0
@@ -162,9 +163,9 @@ def EliminateHeight(MyContours, ratio = 1.0, big = 1):
     return NewContours
 
 # Delete the edges that the area is not equal to the average of width (Default: larger).
-def EliminateSize(MyContours, ratio = 1.0, big = 1):
+def EliminateSize(MyContours, ratio=1.0, big=1):
     if len(MyContours) == 0:
-        raise ZeroDivisionError('*** Error：Contours not found, so the average may be divided by zero. ***')
+        raise ZeroDivisionError('Error: Contours not found, so the average may be divided by zero.')
 
     NewContours = []
     average = 0
@@ -184,9 +185,10 @@ def EliminateSize(MyContours, ratio = 1.0, big = 1):
                 NewContours.append(MyContours[i])
 
     return NewContours
-###################################################################################################
 
-################################# Delete five lines and note bars #################################
+"""
+Delete the five lines and bars of music notes.
+"""
 dst = cv2.adaptiveThreshold(~gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 15, -2)
 # Horizontal lines extraction.
 hor = dst.copy()
@@ -208,9 +210,9 @@ ver = cv2.morphologyEx(ver, cv2.MORPH_OPEN, kernel_v)
 # The background is white and notes are black.
 del_lines = cv2.bitwise_not(ver)
 
-###################################################################################################
-
-####################################### Find the note heads #######################################
+"""
+Find the heads of music notes.
+"""
 # Fixed threshold binarization with gray-scale image as input.
 ret, binary = cv2.threshold(del_lines, 127, 255, cv2.THRESH_BINARY)
 # Find contours.
@@ -225,21 +227,25 @@ for j in range(len(contours)):
     x, y, w, h = cv2.boundingRect(contours[j])
     MyContours.append({'x': x, 'y': y, 'w': w, 'h': h})
 
-MyContours = EliminateRatio(MyContours, 2)
-print(len(MyContours))
-MyContours = EliminateWidth(MyContours, 1, 0)
-print(len(MyContours))
-MyContours = EliminateWidth(MyContours, 1, 1)
-print(len(MyContours))
-MyContours = EliminateHeight(MyContours, 2, 1)
-print(len(MyContours))
-MyContours = EliminateHeight(MyContours, 0.5, 0)
-print(len(MyContours))
-MyContours = EliminateSize(MyContours, 0.9, 0)
-print(len(MyContours))
-###################################################################################################
+"""
+Test.
+"""
+# MyContours = EliminateRatio(MyContours, 2)
+# print(len(MyContours))
+# MyContours = EliminateWidth(MyContours, 1, 0)
+# print(len(MyContours))
+# MyContours = EliminateWidth(MyContours, 1, 1)
+# print(len(MyContours))
+# MyContours = EliminateHeight(MyContours, 2, 1)
+# print(len(MyContours))
+# MyContours = EliminateHeight(MyContours, 0.5, 0)
+# print(len(MyContours))
+# MyContours = EliminateSize(MyContours, 0.9, 0)
+# print(len(MyContours))
 
-######################################### Draw rectangles #########################################
+"""
+Draw rectangles.
+"""
 # Save as (x-coordinate(row), y-coordinate(column)): (width, height)
 coordinate = {}
 
@@ -255,22 +261,20 @@ for i in range(0, len(edge) - 1, 2):
         # Select the rectangle(Capture).
         new_img = img[(y + 2): (y + h - 2), (x + 2): (x + w - 2)]
 
-        height = round((bottom[i] + width - (y + h / 2 + (edge[i] - 85 if (edge[i] - 85) > 0 else 0))) / (width / 2))
+        # height = round((bottom[i] + width - (y + h / 2 + (edge[i] - 85 if (edge[i] - 85) > 0 else 0))) / (width / 2))
+        # cv2.putText(img, str(height), (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.38, (0, 0, 255), 1)
+    # print(bottom[i], img.shape[1], width)
 
-        cv2.putText(img, str(height), (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.38, (0, 0, 255), 1)
-
-    print(bottom[i], img.shape[1], width)
-###################################################################################################
-
-########################################### Save images ###########################################
+"""
+Save images.
+"""
 # Saving path of captures of notes.
-savepath = "C:\\Users\\OscarShu\\Desktop\\SRTP_SaveImg\\"
+savepath = ".\\music_note_extraction"
 if not os.path.isdir(savepath):
     os.makedirs(savepath)
 
 if __name__ == '__main__':
-    # Show image.
-    #cv2.imshow('Gray', gray)
+    # Show images.
     cv2.imshow('Deleted lines', del_lines)
     cv2.waitKey(0)
     cv2.imshow('Final', img)
@@ -278,4 +282,3 @@ if __name__ == '__main__':
     cv2.imwrite((savepath + 'del_lines.png'), del_lines)
     cv2.imwrite((savepath + 'Final.png'), img)
     cv2.destroyAllWindows()
-###################################################################################################
