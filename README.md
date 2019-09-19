@@ -4,7 +4,9 @@
 
 ## Usage 
 ``` python
-python MusicNoteExtraction.py
+python MusicNoteExtraction.py path
+
+path: Image path.
 ```
 
 ## Requirements
